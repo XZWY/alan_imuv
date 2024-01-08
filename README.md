@@ -3,7 +3,7 @@ part of imuv project, using low frequency clean signal to enhance wide band
 
 ##  inference
 ```bash
-export PYTHONPATH=<working direcoty>/alan_imuv
+export PYTHONPATH=<working dir>/alan_imuv
 cd <working direcoty>/alan_imuv/models
 ```
 
