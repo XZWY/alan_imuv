@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import soundfile as sf
 import torch
-from torch import hub
 from torch.utils.data import Dataset, DataLoader
 import random as random
 import os
@@ -179,18 +178,29 @@ class LibriMixIMUV(Dataset):
         min_num_sources=1,
         max_num_sources=3,
         subband_snr_range=[3, 10],
-        segment=5,
+        segment=None,
+        subband_size=800,
+        mode='train'
     ):
         self.csv_dir = csv_dir
         self.noisy = noisy
         self.min_num_sources = min_num_sources
         self.max_num_sources = max_num_sources
         self.subband_snr_range = subband_snr_range
+        self.subband_size = subband_size
+        self.mode = mode
 
         # Get the csv corresponding to the task, default to be libri3mix, noisy
-        md_file = [f for f in os.listdir(csv_dir) if ("both" in f and '360' in f and 'mixture' in f)][0]
+        if self.mode=='train':
+            md_file = [f for f in os.listdir(csv_dir) if ("both" in f and '360' in f and 'mixture' in f)][0]
+            md_clean_file = [f for f in os.listdir(csv_dir) if ("clean" in f and '360' in f and 'mixture' in f)][0]
+        elif self.mode=='dev':
+            md_file = [f for f in os.listdir(csv_dir) if ("both" in f and 'dev' in f and 'mixture' in f)][0]
+            md_clean_file = [f for f in os.listdir(csv_dir) if ("clean" in f and 'dev' in f and 'mixture' in f)][0]
+        else:
+            md_file = [f for f in os.listdir(csv_dir) if ("both" in f and 'test' in f and 'mixture' in f)][0]
+            md_clean_file = [f for f in os.listdir(csv_dir) if ("clean" in f and 'test' in f and 'mixture' in f)][0]
         self.csv_path = os.path.join(self.csv_dir, md_file)
-        md_clean_file = [f for f in os.listdir(csv_dir) if ("clean" in f and '360' in f and 'mixture' in f)][0]
         self.df_clean = pd.read_csv(os.path.join(csv_dir, md_clean_file))
 
         self.segment = segment
@@ -221,7 +231,7 @@ class LibriMixIMUV(Dataset):
         self.mixture_path = mixture_path
         sources_list = []
         # If there is a seg start point is set randomly
-        if self.seg_len is not None:
+        if self.seg_len is not None and self.mode=='train':
             start = random.randint(0, row["length"] - self.seg_len)
             stop = start + self.seg_len
         else:
@@ -230,10 +240,12 @@ class LibriMixIMUV(Dataset):
         # If task is enh_both then the source is the clean mixture
 
         # Read sources
-        n_src = np.random.randint(self.min_num_sources, self.max_num_sources+1)
+        if self.mode == 'train':
+            n_src = np.random.randint(self.min_num_sources, self.max_num_sources+1)
+        else:
+            n_src = int(idx % 3 + 1)
         shuffle_indices = (np.arange(0, 3))
         np.random.shuffle(shuffle_indices)
-        print(n_src)
         for i in range(n_src):
             source_path = row[f"source_{shuffle_indices[i] + 1}_path"]
             s, _ = sf.read(source_path, dtype="float32", start=start, stop=stop)
@@ -261,11 +273,17 @@ class LibriMixIMUV(Dataset):
         # get subband feature
         subband_target_snr = np.random.uniform(self.subband_snr_range[0], self.subband_snr_range[1])
         noise_interference = mixture - target
-        target_sb = librosa.resample(librosa.resample(target, 16000, 2000), 2000, 16000)
-        noise_interference_sb = librosa.resample(librosa.resample(noise_interference, 16000, 2000), 2000, 16000)
+        target_sb = librosa.resample(librosa.resample(target, 16000, self.subband_size*2), self.subband_size*2, 16000)
+        noise_interference_sb = librosa.resample(librosa.resample(noise_interference, 16000, self.subband_size*2), self.subband_size*2, 16000)
         alpha = np.linalg.norm(target_sb) / (np.linalg.norm(noise_interference_sb) * 10**(subband_target_snr / 20))
         alpha = np.clip(alpha, 0, 0.9)
         noisy_target_sb = target_sb + alpha * noise_interference_sb
+
+        min_len = np.min([noisy_target_sb.shape[0], target.shape[0]])
+        target = target[:min_len]
+        noisy_target_sb = noisy_target_sb[:min_len]
+        target_sb = target_sb[:min_len]
+
         
         # print(alpha, subband_target_snr)
         snr = 20 * np.log10(np.linalg.norm(target_sb) / (np.linalg.norm(noisy_target_sb-target_sb) + 1e-8))
@@ -278,6 +296,7 @@ class LibriMixIMUV(Dataset):
         target_sb = torch.from_numpy(target_sb)
         target_sb_noisy = torch.from_numpy(noisy_target_sb)
         
+        batch["n_src"] = torch.tensor(n_src).type(torch.float32)
         batch['mixture'] = mixture
         batch['target'] = target
         batch['target_sb'] = target_sb
@@ -347,24 +366,26 @@ if __name__=='__main__':
         min_num_sources=1,
         max_num_sources=3,
         subband_snr_range=[3, 10],
-        segment=5        
-    )        
-    # batch = collate_func_separation([dataset[0], dataset[1]])
-    # # print(batch)
-    # for key in batch.keys():
-    #     if type(batch[key]) is torch.Tensor:
-    #         print(key, batch[key].shape)
-    batch = dataset[0]
+        # segment=5,
+        mode='dev'     
+    )
+    max_values = []
+    for i in range(50):
+        batch = dataset[i]
+        max_value = batch['mixture'].max()
+        print(max_value)
+        max_values.append(max_value)
+    print('mean of max', torch.tensor(max_values).mean())
+    
+    batch = collate_func_separation([dataset[0]])
+    # print(batch)
+    print(len(dataset))
+    print(batch['snr'])
+    print(batch['n_src'])
     for key in batch.keys():
         if type(batch[key]) is torch.Tensor:
             print(key, batch[key].shape)
-    
-    # batch = collate_func_separation([dataset[0], dataset[1]])
-    # # print(batch)
-    # print(batch['snr'])
-    # for key in batch.keys():
-    #     if type(batch[key]) is torch.Tensor:
-    #         print(key, batch[key].shape)
-    sf.write('target.wav', batch['target'], 16000)
-    sf.write('target_sb.wav', batch['target_sb'], 16000)
-    sf.write('target_sb_noisy.wav', batch['target_sb_noisy'], 16000)
+    # sf.write('mixture.wav', batch['mixture'], 16000)
+    # sf.write('target.wav', batch['target'], 16000)
+    # sf.write('target_sb.wav', batch['target_sb'], 16000)
+    # sf.write('target_sb_noisy.wav', batch['target_sb_noisy'], 16000)

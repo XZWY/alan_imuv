@@ -87,6 +87,7 @@ def train(rank, a, h):
 
     if ckpt is not None:
         optim.load_state_dict(state_dict['optim'])
+        optim.param_groups[0]['capturable'] = True
 
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optim, gamma=h.lr_decay, last_epoch=last_epoch)
 
