@@ -33,14 +33,19 @@ class IMUV_TASNET_SISNR(nn.Module):
 def test():
 
     # remember to run: export PYTHONPATH=<working direcoty>/alan_imuv
+    import os
+    import sys
     from utils import load_checkpoint
 
-    # checkpoint dir
-    ckpt_dir = '/home/exx/Documents/NAS/Datasets/alanweiyang/alan_imuv/models/ckpt_00130000'
+    # set work_dir
+    work_dir = '/home/exx/Documents/NAS/Datasets/alanweiyang'
 
     # inputs
     input = torch.rand(1, 32000) # input mixture, 16kHz sampling rate
     subband_clean_input = torch.rand(1, 32000) # subband input, 16kHz sampling rate, but only contains 800Hz effective(real) frequency
+
+    # checkpoint dir
+    ckpt_dir = os.path.join(work_dir, 'alan_imuv/models/ckpt_00130000')
 
     # normalize the samples so that it matches training
     training_max = 0.4003
