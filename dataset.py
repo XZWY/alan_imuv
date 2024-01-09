@@ -369,13 +369,13 @@ if __name__=='__main__':
         # segment=5,
         mode='dev'     
     )
-    max_values = []
-    for i in range(50):
-        batch = dataset[i]
-        max_value = batch['mixture'].max()
-        print(max_value)
-        max_values.append(max_value)
-    print('mean of max', torch.tensor(max_values).mean())
+    # max_values = []
+    # for i in range(50):
+    #     batch = dataset[i]
+    #     max_value = batch['mixture'].max()
+    #     print(max_value)
+    #     max_values.append(max_value)
+    # print('mean of max', torch.tensor(max_values).mean())
     
     batch = collate_func_separation([dataset[0]])
     # print(batch)
