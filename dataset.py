@@ -34,26 +34,21 @@ class LibriMix(Dataset):
     dataset_name = "LibriMix"
 
     def __init__(
-        self, csv_dir, task="sep_clean", sample_rate=16000, n_src=2, segment=3, return_id=False
+        self, csv_dir, sample_rate=16000, n_src=2, segment=3, return_id=False, mode='train'
     ):
         self.csv_dir = csv_dir
-        self.task = task
         self.return_id = return_id
+        self.mode = mode
         # Get the csv corresponding to the task
-        if task == "enh_single":
-            md_file = [f for f in os.listdir(csv_dir) if ("single" in f and '360' in f and 'mixture' in f)][0]
-            self.csv_path = os.path.join(self.csv_dir, md_file)
-        elif task == "enh_both":
+
+        if self.mode=='train':
             md_file = [f for f in os.listdir(csv_dir) if ("both" in f and '360' in f and 'mixture' in f)][0]
-            self.csv_path = os.path.join(self.csv_dir, md_file)
-            md_clean_file = [f for f in os.listdir(csv_dir) if ("clean" in f and '360' in f and 'mixture' in f)][0]
-            self.df_clean = pd.read_csv(os.path.join(csv_dir, md_clean_file))
-        elif task == "sep_clean":
-            md_file = [f for f in os.listdir(csv_dir) if ("clean" in f and '360' in f and 'mixture' in f)][0]
-            self.csv_path = os.path.join(self.csv_dir, md_file)
-        elif task == "sep_noisy":
-            md_file = [f for f in os.listdir(csv_dir) if ("both" in f and '360' in f and 'mixture' in f)][0]
-            self.csv_path = os.path.join(self.csv_dir, md_file)
+        elif self.mode=='dev':
+            md_file = [f for f in os.listdir(csv_dir) if ("both" in f and 'dev' in f and 'mixture' in f)][0]
+        else:
+            md_file = [f for f in os.listdir(csv_dir) if ("both" in f and 'test' in f and 'mixture' in f)][0]
+        self.csv_path = os.path.join(self.csv_dir, md_file)
+
         self.segment = segment
         self.sample_rate = sample_rate
         # Open csv file
@@ -83,29 +78,21 @@ class LibriMix(Dataset):
         self.mixture_path = mixture_path
         sources_list = []
         # If there is a seg start point is set randomly
-        if self.seg_len is not None:
+        if self.seg_len is not None and self.mode=='train':
             start = random.randint(0, row["length"] - self.seg_len)
             stop = start + self.seg_len
         else:
             start = 0
             stop = None
-        # If task is enh_both then the source is the clean mixture
-        if "enh_both" in self.task:
-            mix_clean_path = self.df_clean.iloc[idx]["mixture_path"]
-            s, _ = sf.read(mix_clean_path, dtype="float32", start=start, stop=stop)
-            sources_list.append(s)
 
-        else:
-            # Read sources
-            for i in range(self.n_src):
-                source_path = row[f"source_{i + 1}_path"]
-                s, _ = sf.read(source_path, dtype="float32", start=start, stop=stop)
-                sources_list.append(s)
-        
+        for i in range(self.n_src):
+            source_path = row[f"source_{i + 1}_path"]
+            s, _ = sf.read(source_path, dtype="float32", start=start, stop=stop)
+            sources_list.append(s)
+    
         # load noise if noisy
-        if "clean" not in self.task:
-            noise_path = self.df.iloc[idx]["noise_path"]
-            noise, _ = sf.read(noise_path, dtype="float32", start=start, stop=stop)
+        noise_path = self.df.iloc[idx]["noise_path"]
+        noise, _ = sf.read(noise_path, dtype="float32", start=start, stop=stop)
         # Read the mixture
         mixture, _ = sf.read(mixture_path, dtype="float32", start=start, stop=stop)
         # Convert to torch tensor
@@ -124,9 +111,8 @@ class LibriMix(Dataset):
         batch = {}
         batch['mixture'] = mixture
         batch['sources'] = sources
-        if "clean" not in self.task:
-            noise = torch.from_numpy(noise)
-            batch['noise'] = noise
+        noise = torch.from_numpy(noise)
+        batch['noise'] = noise
         # batch['ids'] = [id1, id2]
         return batch
 
@@ -343,49 +329,49 @@ if __name__=='__main__':
     # * ``'sep_clean'`` for two-speaker clean source separation.
     # * ``'sep_noisy'`` for two-speaker noisy source separation.
     
-    dataset = LibriMix(csv_dir='/workspace/host/LibriMix/dataset/Libri3Mix/wav16k/min/metadata', task="sep_noisy", sample_rate=16000, n_src=3, segment=5, return_id=False)
-    # batch = collate_func_separation([dataset[0], dataset[1]])
-    # # print(batch)
-    # for key in batch.keys():
-    #     if type(batch[key]) is torch.Tensor:
-    #         print(key, batch[key].shape)
+    dataset = LibriMix(csv_dir='/workspace/host/LibriMix/dataset/Libri2Mix/wav16k/min/metadata', sample_rate=16000, n_src=2, segment=5, return_id=False, mode='train')
+    batch = collate_func_separation([dataset[0]])
+    # print(batch)
+    for key in batch.keys():
+        if type(batch[key]) is torch.Tensor:
+            print(key, batch[key].shape)
     
     batch = dataset[0]
     for key in batch.keys():
         if type(batch[key]) is torch.Tensor:
             print(key, batch[key].shape)
             
-    new_mixture = batch['sources'].sum(0) + batch['noise']
-    # sf.write('mixture.wav', batch['mixture'], 16000)
-    # sf.write('new_mixture.wav', new_mixture, 16000)
+    sf.write('mixture.wav', batch['mixture'], 16000)
+    sf.write('source0.wav', batch['sources'][0], 16000)
+    sf.write('source1.wav', batch['sources'][1], 16000)
     
-    dataset = LibriMixIMUV(
-        csv_dir='/workspace/host/LibriMix/dataset/Libri3Mix/wav16k/min/metadata',
-        sample_rate=16000,
-        noisy=True,
-        min_num_sources=1,
-        max_num_sources=3,
-        subband_snr_range=[3, 10],
-        # segment=5,
-        mode='dev'     
-    )
-    # max_values = []
-    # for i in range(50):
-    #     batch = dataset[i]
-    #     max_value = batch['mixture'].max()
-    #     print(max_value)
-    #     max_values.append(max_value)
-    # print('mean of max', torch.tensor(max_values).mean())
+    # dataset = LibriMixIMUV(
+    #     csv_dir='/workspace/host/LibriMix/dataset/Libri3Mix/wav16k/min/metadata',
+    #     sample_rate=16000,
+    #     noisy=True,
+    #     min_num_sources=1,
+    #     max_num_sources=3,
+    #     subband_snr_range=[3, 10],
+    #     # segment=5,
+    #     mode='dev'     
+    # )
+    # # max_values = []
+    # # for i in range(50):
+    # #     batch = dataset[i]
+    # #     max_value = batch['mixture'].max()
+    # #     print(max_value)
+    # #     max_values.append(max_value)
+    # # print('mean of max', torch.tensor(max_values).mean())
     
-    batch = collate_func_separation([dataset[0]])
-    # print(batch)
-    print(len(dataset))
-    print(batch['snr'])
-    print(batch['n_src'])
-    for key in batch.keys():
-        if type(batch[key]) is torch.Tensor:
-            print(key, batch[key].shape)
-    # sf.write('mixture.wav', batch['mixture'], 16000)
-    # sf.write('target.wav', batch['target'], 16000)
-    # sf.write('target_sb.wav', batch['target_sb'], 16000)
-    # sf.write('target_sb_noisy.wav', batch['target_sb_noisy'], 16000)
+    # batch = collate_func_separation([dataset[0]])
+    # # print(batch)
+    # print(len(dataset))
+    # print(batch['snr'])
+    # print(batch['n_src'])
+    # for key in batch.keys():
+    #     if type(batch[key]) is torch.Tensor:
+    #         print(key, batch[key].shape)
+    # # sf.write('mixture.wav', batch['mixture'], 16000)
+    # # sf.write('target.wav', batch['target'], 16000)
+    # # sf.write('target_sb.wav', batch['target_sb'], 16000)
+    # # sf.write('target_sb_noisy.wav', batch['target_sb_noisy'], 16000)

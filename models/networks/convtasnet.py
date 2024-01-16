@@ -82,10 +82,14 @@ class TasNet(nn.Module):
 
 def test_conv_tasnet():
     x = torch.rand(2, 32000)
-    nnet = TasNet()
+    nnet = TasNet(enc_dim=128, feature_dim=64, sr=16000, win=2, layer=4, stack=1, 
+                 kernel=3, num_spk=2)
     x = nnet(x)
     s1 = x[0]
     print(s1.shape)
+    def count_parameters(model):
+        return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(count_parameters(nnet) / 1000000)
 
 
 if __name__ == "__main__":
