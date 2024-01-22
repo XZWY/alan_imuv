@@ -47,6 +47,14 @@ class LibriMix(Dataset):
             md_file = [f for f in os.listdir(csv_dir) if ("both" in f and 'dev' in f and 'mixture' in f)][0]
         else:
             md_file = [f for f in os.listdir(csv_dir) if ("both" in f and 'test' in f and 'mixture' in f)][0]
+
+        if n_src == 1:
+            if self.mode=='train':
+                md_file = [f for f in os.listdir(csv_dir) if ("single" in f and '360' in f and 'mixture' in f)][0]
+            elif self.mode=='dev':
+                md_file = [f for f in os.listdir(csv_dir) if ("single" in f and 'dev' in f and 'mixture' in f)][0]
+            else:
+                md_file = [f for f in os.listdir(csv_dir) if ("single" in f and 'test' in f and 'mixture' in f)][0]
         self.csv_path = os.path.join(self.csv_dir, md_file)
 
         self.segment = segment
@@ -329,7 +337,7 @@ if __name__=='__main__':
     # * ``'sep_clean'`` for two-speaker clean source separation.
     # * ``'sep_noisy'`` for two-speaker noisy source separation.
     
-    dataset = LibriMix(csv_dir='/workspace/host/LibriMix/dataset/Libri2Mix/wav16k/min/metadata', sample_rate=16000, n_src=2, segment=5, return_id=False, mode='train')
+    dataset = LibriMix(csv_dir='/workspace/host/LibriMix/dataset/Libri2Mix/wav16k/min/metadata', sample_rate=16000, n_src=1, segment=5, return_id=False, mode='train')
     batch = collate_func_separation([dataset[0]])
     # print(batch)
     for key in batch.keys():
@@ -343,7 +351,7 @@ if __name__=='__main__':
             
     sf.write('mixture.wav', batch['mixture'], 16000)
     sf.write('source0.wav', batch['sources'][0], 16000)
-    sf.write('source1.wav', batch['sources'][1], 16000)
+    # sf.write('source1.wav', batch['sources'][1], 16000)
     
     # dataset = LibriMixIMUV(
     #     csv_dir='/workspace/host/LibriMix/dataset/Libri3Mix/wav16k/min/metadata',

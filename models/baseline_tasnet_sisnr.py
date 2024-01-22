@@ -62,14 +62,31 @@ def test():
     target = torch.randn(16000)
 
     # checkpoint dir
-    ckpt_dir = os.path.join(work_dir, 'alan_imuv/models/ckpt_00570000') # load small model
+    ckpt_dir_spk1 = os.path.join(work_dir, 'alan_imuv/models/ckpt_small_tasnet_1spk') # load small model, no interference speaker
+    ckpt_dir_spk2 = os.path.join(work_dir, 'alan_imuv/models/ckpt_small_tasnet_2spk') # load small model, 1 interference speaker
+    ckpt_dir_spk3 = os.path.join(work_dir, 'alan_imuv/models/ckpt_small_tasnet_3spk') # load small model, 2 interference speaker
 
     # instantiate model and load weights
-    # model = Baseline_TASNET_SISNR(enc_dim=512, feature_dim=128, sr=16000, win=2, layer=8, stack=3, kernel=3, num_spk=2) # large model ~5M parameters
-    model = Baseline_TASNET_SISNR(enc_dim=128, feature_dim=64, sr=16000, win=2, layer=4, stack=1, kernel=3, num_spk=2) # small model ~270K parameters
+    # model = Baseline_TASNET_SISNR(enc_dim=512, feature_dim=128, sr=16000, win=2, layer=8, stack=3, kernel=3, num_spk=2) # large model 2 speaker ~5M parameters
+    model_spk1 = Baseline_TASNET_SISNR(enc_dim=128, feature_dim=64, sr=16000, win=2, layer=4, stack=1, kernel=3, num_spk=1) # small model 2 speaker~270K parameters
+    model_spk2 = Baseline_TASNET_SISNR(enc_dim=128, feature_dim=64, sr=16000, win=2, layer=4, stack=1, kernel=3, num_spk=2) # small model 2 speaker~270K parameters
+    model_spk3 = Baseline_TASNET_SISNR(enc_dim=128, feature_dim=64, sr=16000, win=2, layer=4, stack=1, kernel=3, num_spk=3) # small model 2 speaker~270K parameters
 
-    state_dict = load_checkpoint(ckpt_dir, input.device)
-    model.load_state_dict(state_dict['model'])
+    # batch = {}
+    # batch['mixture'] = torch.randn(2, 16000)
+    # batch['sources'] = torch.randn(2, 1, 16000)
+    # batch = model(batch)
+
+    state_dict = load_checkpoint(ckpt_dir_spk1, input.device) # 
+    model_spk1.load_state_dict(state_dict['model'])
+    state_dict = load_checkpoint(ckpt_dir_spk2, input.device) # 
+    model_spk2.load_state_dict(state_dict['model'])
+    state_dict = load_checkpoint(ckpt_dir_spk3, input.device) # 
+    model_spk3.load_state_dict(state_dict['model'])
+
+    # set model
+    model = model_spk3
+
 
     torch.set_printoptions(precision=10)
 

@@ -134,7 +134,7 @@ def test():
     target = torch.randn(16000)
 
     # checkpoint dir
-    ckpt_dir = os.path.join(work_dir, 'alan_imuv/models/ckpt_00130000')
+    ckpt_dir = os.path.join(work_dir, 'alan_imuv/models/ckpt_imu_tasnet')
 
     # normalize the samples so that it matches training
     training_max = 0.4003
