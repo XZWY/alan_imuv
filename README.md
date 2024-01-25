@@ -11,3 +11,8 @@ cd <working direcoty>/alan_imuv/models
 ```python 
 python imuv_tasnet_sisnr.py 
 ```
+
+#### imuv_crn_sisnr.py contains a test() function showing the basic setup to load and inference the model, the comment should be clear there for integration into a notebook
+```python 
+python imuv_crn_sisnr.py 
+```

@@ -60,7 +60,7 @@ class IMUV_TASNET_SISNR(nn.Module):
 #     # subband_clean_input = torch.rand(1, 32000) # subband input, 16kHz sampling rate, but only contains 800Hz effective(real) frequency
 
 #     # checkpoint dir
-#     ckpt_dir = os.path.join(work_dir, 'alan_imuv/models/ckpt_00130000')
+#     ckpt_dir = os.path.join(work_dir, 'alan_imuv/models/ckpt_imu_tasnet')
 
 #     # normalize the samples so that it matches training
 #     training_max = 0.4003
@@ -76,7 +76,8 @@ class IMUV_TASNET_SISNR(nn.Module):
 
 #     torch.set_printoptions(precision=10)
 #     # running inference
-#     output = model.inference(input, subband_clean_input) # 1, n_samples
+#     with torch.no_grad():
+#         output = model.inference(input, subband_clean_input) # 1, n_samples
 #     print(output.shape)
 
 #     target = batch['target']
