@@ -22,7 +22,9 @@ class IMUV_TASNET_SISNR(nn.Module):
         return -calc_sdr_torch(output, reference)
 
     def forward(self, batch):
-        output = self.inference(batch['mixture'], batch['target_sb_noisy'])
+        # output = self.inference(batch['mixture'], batch['target_sb_noisy'])
+        output = self.inference(batch['mixture'], batch['target_sb_gaussian'])
+        
         loss = self.loss(output, batch['target'])
 
         batch['output'] = output
@@ -135,7 +137,7 @@ def test():
     target = torch.randn(16000)
 
     # checkpoint dir
-    ckpt_dir = os.path.join(work_dir, 'alan_imuv/models/ckpt_imu_tasnet')
+    ckpt_dir = os.path.join(work_dir, 'alan_imuv/models/ckpt_imu_tasnet_500_gaussian_blur')
 
     # normalize the samples so that it matches training
     training_max = 0.4003
@@ -160,6 +162,7 @@ def test():
 
 
     # running inference
+    model.eval()
     with torch.no_grad():
         output = model.inference(input, subband_clean_input) # 1, n_samples
 
